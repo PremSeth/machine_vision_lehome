@@ -221,7 +221,7 @@ def run_evaluation_loop(
             save_videos_from_observations(
                 episode_frames,
                 success=success if success_flag else torch.tensor(False),
-                save_dir=args.video_dir,
+                save_dir=os.path.join(args.video_dir, garment_name),
                 episode_idx=i,
             )
 

@@ -1,7 +1,11 @@
 import torch
+import torch.nn.functional as F
 import numpy as np
+from pathlib import Path
 from typing import Dict, Any, Optional, Set, Union
 from torch import Tensor
+from torch import nn
+from torchvision import models
 
 from lerobot.configs.policies import PreTrainedConfig
 from lerobot.policies.factory import make_policy, make_pre_post_processors
@@ -65,6 +69,19 @@ class LeRobotPolicy(BasePolicy):
             self.input_features = set(policy_cfg.input_features.keys())
             self._filter_metadata(meta, self.input_features)
 
+        self.fold_model = None
+        if self.input_features and "observation.environment_state" in self.input_features:
+            checkpoint = torch.load(
+                Path(dataset_root).resolve().parents[2] / "resnet_training/fold_resnet.pt",
+                map_location="cpu",
+            )
+            self.fold_model = models.resnet18(weights=None)
+            self.fold_model.fc = nn.Linear(self.fold_model.fc.in_features, 4)
+            self.fold_model.load_state_dict(checkpoint["model"])
+            self.fold_model.to(self.device).eval()
+            self.fold_mean = torch.tensor([0.485, 0.456, 0.406], device=self.device).view(1, 3, 1, 1)
+            self.fold_std = torch.tensor([0.229, 0.224, 0.225], device=self.device).view(1, 3, 1, 1)
+
         # 4. Create Policy
         self.policy = make_policy(policy_cfg, ds_meta=meta)
         self.policy.eval()
@@ -98,6 +115,16 @@ class LeRobotPolicy(BasePolicy):
         Returns:
             action: Numpy array of action values (un-normalized).
         """
+        if self.fold_model is not None:
+            image = torch.from_numpy(observation["observation.images.top_rgb"]).to(self.device)
+            image = image.permute(2, 0, 1).float().unsqueeze(0) / 255.0
+            image = F.interpolate(image, (224, 224), mode="bilinear", align_corners=False)
+            observation = dict(observation)
+            with torch.inference_mode():
+                observation["observation.environment_state"] = torch.softmax(
+                    self.fold_model((image - self.fold_mean) / self.fold_std), dim=1
+                ).squeeze(0).cpu().numpy()
+
         # 1. Filter observations (keep only what the policy needs)
         if self.input_features:
             observation = self._filter_observations(observation, self.input_features)
