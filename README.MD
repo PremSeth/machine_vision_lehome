@@ -117,3 +117,55 @@ To continue, I actually believe that laundry folding and dexterous manipulation 
 Sunday Robotics: https://www.youtube.com/watch?v=d7I1wj0Gkik&t=4s 
 
 Figure: https://www.youtube.com/watch?v=HOoRnv3lA0k
+
+## Reproducing My Work
+
+I've uploaded all of my model weights onto this repo and so reproducing my work should be straightforward once you set up the LeHome environment.
+
+I recommend you follow steps 1 and 2 listed in the `LEHOME.MD` file in this repo to get the environment set up and download the original LeHome assets and datasets. After cloning this repo, run the following command to make sure the actual model weight files are downloaded from Git LFS.
+
+```bash
+git lfs pull
+```
+
+Before evaluating or training one of the ResNet ACT policies, run the following script on a computer or HPC node with a GPU.
+
+```bash
+python comp_robo_assets/comp_robo_code/add_fold_state_to_dataset.py
+```
+
+This uses the ResNet weight already included in the repo to add the laundry state vector into a new dataset at `Datasets/example/top_long_with_fold_state`.
+
+Then use the following evaluation script provided by LeHome on a computer or HPC node with a GPU. The policy path can be changed to any of the three folders in `comp_robo_assets/model_weights`. If you deal with an error while parsing the paths, try using absolute paths.
+
+```bash
+python -m scripts.eval \
+    --policy_type lerobot \
+    --policy_path comp_robo_assets/model_weights/resnet_act_scratch \
+    --garment_type "top_long" \
+    --dataset_root Datasets/example/top_long_with_fold_state \
+    --num_episodes 2 \
+    --enable_cameras \
+    --device cpu
+```
+
+Even though the policy device is set to CPU, a GPU is still needed to run the simulator and cameras.
+
+If you want to retrain the ResNet itself from the labeled screenshots in the repo, run the following command before creating the new dataset.
+
+```bash
+python comp_robo_assets/comp_robo_code/train_resnet.py
+```
+
+To train the ResNet ACT policy from scratch, use the provided LeHome training command after creating the new dataset.
+
+```bash
+lerobot-train \
+  --config_path=comp_robo_assets/comp_robo_code/train_resnet_act.yaml \
+  --steps=30000 \
+  --batch_size=24 \
+  --num_workers=8 \
+  --save_freq=5000 \
+  --log_freq=1000 \
+  --output_dir=outputs/train/resnet_act_scratch
+```
