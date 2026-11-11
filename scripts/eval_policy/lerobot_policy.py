@@ -72,7 +72,8 @@ class LeRobotPolicy(BasePolicy):
         self.fold_model = None
         if self.input_features and "observation.environment_state" in self.input_features:
             checkpoint = torch.load(
-                Path(dataset_root).resolve().parents[2] / "resnet_training/fold_resnet.pt",
+                Path(dataset_root).resolve().parents[2]
+                / "comp_robo_assets/resnet_training/fold_resnet.pt",
                 map_location="cpu",
             )
             self.fold_model = models.resnet18(weights=None)

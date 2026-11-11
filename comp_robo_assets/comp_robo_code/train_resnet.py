@@ -6,7 +6,8 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, models, transforms
 
 
-data_folder = Path(__file__).parent
+root = Path(__file__).resolve().parents[2]
+data_folder = root / "comp_robo_assets/resnet_training"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 clean_images = transforms.Compose([

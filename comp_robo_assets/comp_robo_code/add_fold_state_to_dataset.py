@@ -13,12 +13,14 @@ from torchvision import models
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
 
-root = Path(__file__).resolve().parents[1]
+root = Path(__file__).resolve().parents[2]
 source = root / "Datasets/example/top_long_merged"
 output = root / "Datasets/example/top_long_with_fold_state"
 device = "cuda"
 
-checkpoint = torch.load(root / "resnet_training/fold_resnet.pt", map_location="cpu")
+checkpoint = torch.load(
+    root / "comp_robo_assets/resnet_training/fold_resnet.pt", map_location="cpu"
+)
 model = models.resnet18(weights=None)
 model.fc = nn.Linear(model.fc.in_features, 4)
 model.load_state_dict(checkpoint["model"])
