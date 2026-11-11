@@ -1,38 +1,43 @@
+#this file is a training file that gets parsed for information on how to train the ACT policy
 dataset:
   repo_id: repo_act
-  root: Datasets/example/top_long_with_fold_state
+  root: Datasets/example/top_long_with_fold_state #this points it towards our dataset with laundry state appended
 
 policy:
   type: act
-  device: cuda
-  push_to_hub: false
+  device: cuda #training on gpu so this is left as cuda
+  push_to_hub: false #we don't use huggingface to store our weights so this is false
   
   input_features:
     observation.state:
-      type: STATE
-      shape: [12]
+      type: STATE 
+      shape: [12] #we have 12 joint values as robot state so this is size 12
     observation.images.top_rgb:
       type: VISUAL
-      shape: [3, 480, 640]
+      shape: [3, 480, 640] #we have RGB cameras that are 480, 640 so thats why its 3, 480, 640
     observation.images.left_rgb:
       type: VISUAL
-      shape: [3, 480, 640]
+      shape: [3, 480, 640] #we have RGB cameras that are 480, 640 so thats why its 3, 480, 640
     observation.images.right_rgb:
       type: VISUAL
-      shape: [3, 480, 640]
+      shape: [3, 480, 640] #we have RGB cameras that are 480, 640 so thats why its 3, 480, 640
+
+    #this is the crucial code we added into this yaml file that differs from the base that 
+    #tells ACT to look for environment_state when training and use our laundry state vector
     observation.environment_state:
       type: ENV
       shape: [4]
   
+  # Predict the next twelve robot joint values.
   output_features:
     action:
       type: ACTION
       shape: [12]
 
-output_dir: outputs/train/resnet_act_top_long
-batch_size: 16
-steps: 30000
-save_freq: 5000
+output_dir: outputs/train/resnet_act_top_long #output location of weights
+batch_size: 16 
+steps: 30000 #number of steps trained for
+save_freq: 5000 #how many steps until a model weight checkpoint gets saved
 log_freq: 1000
 
 wandb:

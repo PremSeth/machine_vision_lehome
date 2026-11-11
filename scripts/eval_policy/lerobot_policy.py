@@ -19,6 +19,7 @@ from .registry import PolicyRegistry
 
 logger = get_logger(__name__)
 
+#all code and comments besides 72-92 and 127-142 are existing LeHome code and comments not mine
 
 @PolicyRegistry.register("lerobot")
 class LeRobotPolicy(BasePolicy):
@@ -69,17 +70,24 @@ class LeRobotPolicy(BasePolicy):
             self.input_features = set(policy_cfg.input_features.keys())
             self._filter_metadata(meta, self.input_features)
 
+        #this starts as none so base policies that do not use laundry state work normally
         self.fold_model = None
+
+        #this only loads our resnet if environment state is one of the inputs the ACT policy was trained with
         if self.input_features and "observation.environment_state" in self.input_features:
+            #this finds and loads the same resnet weights used to create the training dataset
             checkpoint = torch.load(
                 Path(dataset_root).resolve().parents[2]
                 / "comp_robo_assets/resnet_training/fold_resnet.pt",
                 map_location="cpu",
             )
-            self.fold_model = models.resnet18(weights=None)
-            self.fold_model.fc = nn.Linear(self.fold_model.fc.in_features, 4)
-            self.fold_model.load_state_dict(checkpoint["model"])
-            self.fold_model.to(self.device).eval()
+
+            self.fold_model = models.resnet18(weights=None) #we use none because our trained weights are loaded below
+            self.fold_model.fc = nn.Linear(self.fold_model.fc.in_features, 4) #rebuilds our four output head
+            self.fold_model.load_state_dict(checkpoint["model"]) #puts our trained weights into the resnet
+            self.fold_model.to(self.device).eval() #moves it to the gpu and puts it in inference mode
+
+            #these are the same normalization values used for training and creating the ACT dataset
             self.fold_mean = torch.tensor([0.485, 0.456, 0.406], device=self.device).view(1, 3, 1, 1)
             self.fold_std = torch.tensor([0.229, 0.224, 0.225], device=self.device).view(1, 3, 1, 1)
 
@@ -116,15 +124,22 @@ class LeRobotPolicy(BasePolicy):
         Returns:
             action: Numpy array of action values (un-normalized).
         """
+        #this block only runs for a policy that was trained with our laundry state input
         if self.fold_model is not None:
+            #this gets the current top camera image and changes it from a numpy array to a gpu tensor
             image = torch.from_numpy(observation["observation.images.top_rgb"]).to(self.device)
+
+            #this changes the image to channel first, adds a batch dimension, and maps its pixels from 0 to 1
             image = image.permute(2, 0, 1).float().unsqueeze(0) / 255.0
-            image = F.interpolate(image, (224, 224), mode="bilinear", align_corners=False)
-            observation = dict(observation)
+            image = F.interpolate(image, (224, 224), mode="bilinear", align_corners=False) #resizes the image for resnet
+            observation = dict(observation) #makes a copy so we can add our new input without changing the original
+
+            #inference mode means the resnet is only predicting and is not being trained here and faster than nograd mode
             with torch.inference_mode():
+                #this normalizes the image, runs resnet, and turns its four outputs into probabilities
                 observation["observation.environment_state"] = torch.softmax(
                     self.fold_model((image - self.fold_mean) / self.fold_std), dim=1
-                ).squeeze(0).cpu().numpy()
+                ).squeeze(0).cpu().numpy() #removes the batch dimension and changes the result back to numpy
 
         # 1. Filter observations (keep only what the policy needs)
         if self.input_features:
